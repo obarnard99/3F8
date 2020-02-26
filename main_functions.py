@@ -97,3 +97,26 @@ def evaluate_basis_functions(l, X, Z):
     r2 = np.outer(X2, ones_Z) - 2 * np.dot(X, Z.T) + np.outer(ones_X, Z2)
     return np.exp(-0.5 / l**2 * r2)
 
+
+def compute_confusion_matrix(X_tilde, w, y):
+    """Computes the confusion matrix"""
+    sigmoid_values = predict(X_tilde, w)
+    thresholded_values = sigmoid_values > 0.5
+    num_ones = np.count_nonzero(y)
+    num_zeros = len(y) - num_ones
+    confusion = [0, 0, 0, 0]
+    for i in range(len(y)):
+        # True negatives
+        if y[i] == 0 and thresholded_values[i] == 0:
+            confusion[0] += 1 / num_zeros
+        # False positives
+        elif y[i] == 0 and thresholded_values[i] == 1:
+            confusion[1] += 1 / num_zeros
+        # False negatives
+        elif y[i] == 1 and thresholded_values[i] == 0:
+            confusion[2] += 1 / num_ones
+        # True positives
+        elif y[i] == 1 and thresholded_values[i] == 1:
+            confusion[3] += 1 / num_ones
+    return confusion
+

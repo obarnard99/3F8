@@ -33,12 +33,13 @@ def logistic(x):
 
 def predict(X_tilde, w):
     """Function that makes predictions with a logistic classifier"""
-    return logistic(np.dot(X_tilde, w)) # Outputs a vectors
+    return logistic(np.dot(X_tilde, w)) # Outputs a vector
 
 
 def compute_average_ll(X_tilde, y, w):
     """Function that computes the average loglikelihood of the logistic classifier on some data"""
     output_prob = predict(X_tilde, w)
+    #print(output_prob)
     return np.mean(y * np.log(output_prob) + (1 - y) * np.log(1.0 - output_prob))
 
 
@@ -58,7 +59,7 @@ def fit_w(X_tilde_train, y_train, X_tilde_test, y_test, n_steps, alpha):
         w = w + alpha*grad
         ll_train[ i ] = compute_average_ll(X_tilde_train, y_train, w)
         ll_test[ i ] = compute_average_ll(X_tilde_test, y_test, w)
-        print(ll_train[ i ], ll_test[ i ])
+        #print(ll_train[ i ], ll_test[ i ])
 
     return w, ll_train, ll_test
 

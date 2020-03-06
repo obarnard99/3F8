@@ -1,5 +1,4 @@
-from Lab.main_functions import *
-
+from FTR.main_functions import *
 
 # Import dataset
 X = np.loadtxt('X.txt')
@@ -24,8 +23,10 @@ n_steps = 100
 # Train classifier
 X_tilde_train = get_x_tilde(X_train)
 X_tilde_test = get_x_tilde(X_test)
-w, ll_train, ll_test = fit_w(X_tilde_train, y_train, X_tilde_test, y_test, n_steps, alpha)
 
-#print(ll_train)
-#print(ll_test)
-print(compute_confusion_matrix(X_tilde_test, w, y_test))
+w = np.random.randn(X_tilde_train.shape[1])
+print(w.shape)
+prior = init_prior(w, 1)
+print(prior(w))
+print(predict(X_tilde_train, w))
+print(f(w, X_tilde_train, prior))

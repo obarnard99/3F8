@@ -39,7 +39,7 @@ class BayesianLogisticClassifier:
         AN = self.compute_AN(X_tilde, w)
         sigma2 = np.diag(X_tilde @ AN @ np.transpose(X_tilde))
         prediction = self.logistic(np.divide(mu, np.sqrt(np.ones(
-            mu.shape[0]) - np.pi * sigma2 / 8)))  # Operates over the rows of X_tilde and outputs a vector
+            mu.shape[0]) + np.pi * sigma2 / 8)))  # Operates over the rows of X_tilde and outputs a vector
         return prediction
 
     def compute_average_ll(self, X_tilde, y, w):
@@ -59,7 +59,7 @@ class BayesianLogisticClassifier:
         ll_test = np.zeros(n_steps)
         for i in range(n_steps):
             sigmoid_value = self.logistic(np.dot(X_tilde_train, w))
-            grad = np.matmul(np.transpose(X_tilde_train), y_train - sigmoid_value) - w / self.sigma02
+            grad = np.transpose(X_tilde_train) @ (y_train - sigmoid_value) - w / self.sigma02
             w = w + alpha * grad
             ll_train[i] = self.compute_average_ll(X_tilde_train, y_train, w)
             ll_test[i] = self.compute_average_ll(X_tilde_test, y_test, w)
@@ -123,10 +123,13 @@ class BayesianLogisticClassifier:
     def compute_AN(self, X_tilde, w):
         A0 = 1 / self.sigma02 * np.identity(w.shape[0])
         sigmoid_value = self.logistic(np.dot(X_tilde, w))
-        AN = A0 + np.matmul(
-            np.matmul(np.transpose(X_tilde),
-                      np.diag(np.multiply(sigmoid_value, np.ones(sigmoid_value.shape[0]) - sigmoid_value))),
-            X_tilde)
+        AN = A0 + np.transpose(X_tilde) @ np.diag(np.multiply(sigmoid_value, np.ones(sigmoid_value.shape[0]) - sigmoid_value)) @ X_tilde
+        '''
+        AN = A0
+        for row in X_tilde:
+            sigmoid_value = self.logistic(np.dot(row, w))
+            AN += sigmoid_value*(1-sigmoid_value)*row @ np.transpose(row)
+        '''
         return AN
 
     '''

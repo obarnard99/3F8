@@ -21,7 +21,7 @@ y_test = y[n_train:]
 
 # Define hyperparameters
 alpha = 0.0001
-n_steps = 1000
+n_steps = 100
 l = 1
 sigma02 = 1
 

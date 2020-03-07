@@ -17,9 +17,9 @@ y_train = y[0: n_train]
 y_test = y[n_train:]
 
 # Define hyperparameters
-alpha = 0.01 # Learning rate
-n_steps = 10000 # Number of iterations
-l = 0.01 # RBF width
+alpha = 0.0001 # Learning rate
+n_steps = 1000 # Number of iterations
+l = 1 # RBF width
 
 # Train the classifier
 X_tilde_train = get_x_tilde(evaluate_basis_functions(l, X_train, X_train))
@@ -31,4 +31,4 @@ w, ll_train, ll_test = fit_w(X_tilde_train, y_train, X_tilde_test, y_test, n_ste
 #plot_ll(ll_test)
 
 # Plot the predictive distribution
-#plot_predictive_distribution(X, y, w, lambda x : evaluate_basis_functions(l, x, X_train))
+plot_predictive_distribution(X, y, w, lambda x : evaluate_basis_functions(l, x, X_train))

@@ -59,7 +59,6 @@ def fit_w(X_tilde_train, y_train, X_tilde_test, y_test, n_steps, alpha):
         w = w + alpha*grad
         ll_train[ i ] = compute_average_ll(X_tilde_train, y_train, w)
         ll_test[ i ] = compute_average_ll(X_tilde_test, y_test, w)
-        #print(ll_train[ i ], ll_test[ i ])
 
     return w, ll_train, ll_test
 

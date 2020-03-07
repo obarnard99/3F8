@@ -1,4 +1,4 @@
-from main_functions import *
+from Lab.main_functions import *
 
 # Import dataset
 X = np.loadtxt('X.txt')

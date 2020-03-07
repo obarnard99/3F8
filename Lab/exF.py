@@ -1,4 +1,4 @@
-from main_functions import *
+from Lab.main_functions import *
 
 # Import dataset
 X = np.loadtxt('X.txt')
@@ -27,7 +27,7 @@ X_tilde_test = get_x_tilde(evaluate_basis_functions(l, X_test, X_train))
 w, ll_train, ll_test = fit_w(X_tilde_train, y_train, X_tilde_test, y_test, n_steps, alpha)
 
 # Plot the training and test log likelihoods
-plot_ll(ll_train)
+#plot_ll(ll_train)
 #plot_ll(ll_test)
 
 # Plot the predictive distribution

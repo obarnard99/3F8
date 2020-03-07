@@ -33,7 +33,7 @@ def logistic(x):
 
 def predict(X_tilde, w):
     """Function that makes predictions with a logistic classifier"""
-    return logistic(np.dot(X_tilde, w)) # Operates over the rows of X_tilde and outputs a vector
+    return logistic(np.dot(X_tilde, w)) # Operates over the rows of X_tilde and outputs a vector # np.dot() and np.matmul() are the same here
 
 
 def compute_average_ll(X_tilde, y, w):

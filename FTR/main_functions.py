@@ -34,7 +34,12 @@ def logistic(x):
 
 def predict(X_tilde, w):
     """Function that makes predictions with a logistic classifier"""
-    return logistic(np.dot(X_tilde, w))  # Operates over the rows of X_tilde and outputs a vector
+    mu = np.dot(X_tilde, w)
+    sigmoid_value = logistic(np.dot(X_tilde, w))
+    sigma2 = np.multiply(sigmoid_value, np.ones(sigmoid_value.shape[0]) - sigmoid_value)
+    prediction = logistic(np.divide(mu, np.sqrt(np.ones(
+        sigmoid_value.shape[0]) - np.pi * sigma2 / 8)))  # Operates over the rows of X_tilde and outputs a vector
+    return prediction
 
 
 def compute_average_ll(X_tilde, y, w):
@@ -49,14 +54,14 @@ def get_x_tilde(X):
     return np.concatenate((np.ones((X.shape[0], 1)), X), 1)
 
 
-def fit_w(X_tilde_train, y_train, X_tilde_test, y_test, n_steps, alpha):
+def fit_w(X_tilde_train, y_train, X_tilde_test, y_test, n_steps, alpha, sigma02):
     """Function that finds the model parameters by optimising the likelihood using gradient descent"""
     w = np.random.randn(X_tilde_train.shape[1])
     ll_train = np.zeros(n_steps)
     ll_test = np.zeros(n_steps)
     for i in range(n_steps):
-        sigmoid_value = predict(X_tilde_train, w)
-        grad = np.matmul(np.transpose(X_tilde_train), y_train - sigmoid_value)
+        sigmoid_value = logistic(np.dot(X_tilde_train, w))
+        grad = np.matmul(np.transpose(X_tilde_train), y_train - sigmoid_value) - w / sigma02
         w = w + alpha * grad
         ll_train[i] = compute_average_ll(X_tilde_train, y_train, w)
         ll_test[i] = compute_average_ll(X_tilde_test, y_test, w)
@@ -122,6 +127,16 @@ def compute_confusion_matrix(X_tilde, w, y):
     return confusion
 
 
+def compute_ANinv(X_tilde, w, sigma02):
+    A0inv = 1 / sigma02 * np.identity(w.shape[0])
+    sigmoid_value = logistic(np.dot(X_tilde, w))
+    ANinv = A0inv + np.matmul(
+        np.matmul(np.transpose(X_tilde), np.diag(np.multiply(sigmoid_value, np.ones(sigmoid_value.shape[0]) - sigmoid_value))),
+        X_tilde)
+    return ANinv
+
+
+'''
 def f(w, X_tilde, prior):
     """Returns the unnormalised posterior"""
     return np.prod(predict(X_tilde, w))*prior(w)
@@ -134,3 +149,4 @@ def init_prior(w, sigma0):
         return np.exp(-0.5 * np.matmul(np.matmul(np.transpose(w), A0inv), w))
 
     return prior
+'''

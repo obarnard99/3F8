@@ -20,9 +20,9 @@ y_train = y[0: n_train]
 y_test = y[n_train:]
 
 # Define hyperparameters
-alpha = 0.0001
-n_steps = 100
-l = 1
+alpha = 0.001
+n_steps = 1000
+l = 0.1
 sigma02 = 1
 
 # Initialise classifier

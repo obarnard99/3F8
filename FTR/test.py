@@ -22,7 +22,7 @@ y_test = y[n_train:]
 # Define hyperparameters
 alpha = 0.001
 n_steps = 1000
-sigma02 = 10
+sigma02 = 1
 
 # Initialise classifier
 BLC = BayesianLogisticClassifier(sigma02)
@@ -30,8 +30,19 @@ BLC = BayesianLogisticClassifier(sigma02)
 # Train the classifier
 X_tilde_train = BLC.get_x_tilde(X_train)
 X_tilde_test = BLC.get_x_tilde(X_test)
-w, ll_train, ll_test = BLC.fit_w(X_tilde_train, y_train, X_tilde_test, y_test, n_steps, alpha)
 
+wmap = BLC.compute_wmap(X_tilde_train, y_train)
+#AN = BLC.compute_AN(X_tilde_train, wmap)
+#Z = BLC.compute_evidence(wmap, AN)
+
+print(wmap)
+
+#w, ll_train, ll_test = BLC.fit_w(X_tilde_train, y_train, X_tilde_test, y_test, n_steps, alpha)
+
+#print('My Estimate: {0:.3}'.format(BLC.f(w, X_tilde_train)))
+#print('SciPy Estimate: {0:.3}'.format(BLC.f(BLC.compute_wmap(X_tilde_train)[0], X_tilde_train)))
+
+'''
 # Plot the training and test log likelihoods
 #BLC.plot_ll(ll_train)
 #BLC.plot_ll(ll_test)
@@ -47,3 +58,4 @@ print('Test: {0:.3}'.format(ll_test[-1]))
 confusion = BLC.compute_confusion_matrix(X_tilde_test, w, y_test)
 print('[{0:.3}, {1:.3}]'.format(confusion[0], confusion[1]))
 print('[{0:.3}, {1:.3}]'.format(confusion[2], confusion[3]))
+'''

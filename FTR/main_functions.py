@@ -1,10 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.optimize
 
 
 class BayesianLogisticClassifier:
-    def __init__(self, sigma02):
+    def __init__(self, sigma02, X_tilde_train, y_train, X_tilde_test, y_test):
         self.sigma02 = sigma02
+        self. X_tilde_train = X_tilde_train
+        self.y_train = y_train
+        self.X_tilde_test = X_tilde_test
+        self.y_test = y_test
 
     def plot_data_internal(self, X, y):
         """Function that plots the points in 2D together with their labels"""
@@ -121,7 +126,7 @@ class BayesianLogisticClassifier:
         return confusion
 
     def compute_AN(self, X_tilde, w):
-        A0 = 1 / self.sigma02 * np.identity(w.shape[0])
+        A0 = 1 / self.sigma02 * np.identity(len(w))
         sigmoid_value = self.logistic(np.dot(X_tilde, w))
         AN = A0 + np.transpose(X_tilde) @ np.diag(np.multiply(sigmoid_value, np.ones(sigmoid_value.shape[0]) - sigmoid_value)) @ X_tilde
         '''
@@ -132,17 +137,31 @@ class BayesianLogisticClassifier:
         '''
         return AN
 
-    '''
-    def f(w, X_tilde, prior):
+    def f(self, w, X_tilde):
         """Returns the unnormalised posterior"""
-        return np.prod(predict(X_tilde, w))*prior(w)
-    
-    
-    def init_prior(w, sigma0):
-        A0inv = 1 / sigma0 ** 2 * np.identity(w.shape[0])
-    
-        def prior(w):
-            return np.exp(-0.5 * np.matmul(np.matmul(np.transpose(w), A0inv), w))
-    
-        return prior
-    '''
+        A0 = 1 / self.sigma02 * np.identity(w.shape[0])
+        prior = np.exp(-0.5 * np.transpose(w) @ A0 @ w)
+        return np.prod(self.predict(X_tilde, w))*prior
+
+    def log_f(self, w, *args):
+        """Function that computes the average loglikelihood of the logistic classifier on some data"""
+        X_tilde = args[0]
+        y = args[1]
+        output_prob = self.predict(X_tilde, w)
+        A0 = 1 / self.sigma02 * np.identity(w.shape[0])
+        # print(output_prob)
+        with np.errstate(divide='raise'):
+            try:
+                return np.sum(y * np.log(output_prob) + (1 - y) * np.log(1.0 - output_prob)) - (0.5 * np.transpose(w) @ A0 @ w)
+            except FloatingPointError:
+                print('here')
+                return np.sum(y * (X_tilde @ w) + (1 - y) * np.log(1.0 - output_prob)) - (
+                            0.5 * np.transpose(w) @ A0 @ w)
+
+    def compute_wmap(self, X_tilde_train, y):
+        w0 = np.random.randn(X_tilde_train.shape[1])
+        wmap = scipy.optimize.fmin_l_bfgs_b(self.log_f, w0, args=tuple([X_tilde_train, y]), approx_grad=True)
+        return wmap
+
+    def compute_evidence(self, wmap, AN):
+        return np.exp(self.log_f(wmap, args=tuple([X_tilde_train, y])))*(2*np.pi)**(wmap.shape[0]/2)*np.linalg.det(AN)**(-0.5)

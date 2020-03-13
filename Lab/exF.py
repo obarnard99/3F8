@@ -18,7 +18,7 @@ y_test = y[n_train:]
 
 # Define hyperparameters
 alpha = 0.0001 # Learning rate
-n_steps = 1000 # Number of iterations
+n_steps = 10000 # Number of iterations
 l = 1 # RBF width
 
 # Train the classifier

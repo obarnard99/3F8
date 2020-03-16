@@ -7,9 +7,9 @@ X = 'X.txt'
 y = 'y.txt'
 
 # Define hyperparameters
-sigma02 = 10
+sigma02 = 1
 RBF = True
-l = 1
+l = 0.1
 
 # Initialise classifier
 BLC = BayesianLogisticClassifier(X, y, l, sigma02, RBF=RBF)
@@ -22,7 +22,7 @@ BLC.update_AN(wmap)
 BLC.plot_predictive_distribution(wmap)
 
 # Compute confusion matrix
-BLC.set_mode('test')
+BLC.set_mode('train')
 confusion = BLC.compute_confusion_matrix(wmap)
 print('[{0:.3}, {1:.3}]'.format(confusion[0], confusion[1]))
 print('[{0:.3}, {1:.3}]'.format(confusion[2], confusion[3]))

@@ -64,8 +64,8 @@ class BayesianLogisticClassifier:
     def _logistic(self, x):
         """The logistic function"""
         f = np.array([])
-        with np.errstate(over='raise'):
-            for i in x:
+        with np.errstate(all='raise'):
+            for i in x: # What about very large negative vals?
                 try:
                     val = 1.0 / (1.0 + np.exp(-i))
                 except FloatingPointError:
@@ -73,15 +73,17 @@ class BayesianLogisticClassifier:
                 f = np.append(f, val)
         return f
 
-    def _predict(self, X_tilde, w):
+    def _predict(self, X_tilde, w, ll=False):
         """Function that makes predictions with a logistic classifier"""
-        prediction = np.array([])
         mu = np.dot(X_tilde, w)
         sigma2 = np.diag(X_tilde @ self.AN @ np.transpose(X_tilde))
         exponent = np.divide(mu, np.sqrt(1 + np.pi * sigma2 / 8))
         prediction = self._logistic(exponent)
         inds = np.where(np.isnan(prediction))
-        prediction[inds] = np.take(exponent, inds)
+        if ll:
+            prediction[inds] = -np.take(exponent, inds)
+        else:
+            prediction[inds] = 1
         return prediction
 
     def update_AN(self, w):
@@ -92,7 +94,7 @@ class BayesianLogisticClassifier:
 
     def _compute_ll(self, w):
         """Function that computes the loglikelihood of the logistic classifier on some data, multiplied by -1"""
-        ErrorHandler = False
+        ErrorHandler = True
         iterCount = False
         if iterCount:
             self.count += 1
@@ -101,21 +103,19 @@ class BayesianLogisticClassifier:
 
         A0 = 1 / self.sigma02 * np.identity(w.shape[0])
         self.update_AN(w)
-        output_prob = self._predict(self.X_tilde, w)#self._logistic(np.dot(self.X_tilde, w))
+        output_prob = self._predict(self.X_tilde, w, ll=True)#self._logistic(np.dot(self.X_tilde, w))
         grad = -1 * (np.transpose(self.X_tilde) @ (self.y - output_prob) - w / self.sigma02)
-        '''
         log_f = np.array([])
         if ErrorHandler:
             for idx, prob in enumerate(output_prob):
-                if prob == 0. or prob == 1.:
-                    val = 0.0
+                if prob < 0.:
+                    val = -prob
                 else:
                     val = self.y[idx] * np.log(prob) + (1. - self.y[idx]) * np.log(1.0 - prob)
                 log_f = np.append(log_f, val)
             log_f = -1 * (np.sum(log_f) - (0.5 * np.transpose(w) @ A0 @ w))
         else:
-        '''
-        log_f = -1. * (np.sum(self.y * np.log(output_prob) + (1. - self.y) * np.log(1.0 - output_prob)) - (
+            log_f = -1. * (np.sum(self.y * np.log(output_prob) + (1. - self.y) * np.log(1.0 - output_prob)) - (
                         0.5 * np.transpose(w) @ A0 @ w))
         return log_f, grad
 

@@ -4,12 +4,9 @@ import scipy.optimize
 
 
 class BayesianLogisticClassifier:
-    def __init__(self, sigma02, X_tilde_train, y_train, X_tilde_test, y_test):
+    def __init__(self, sigma02):
         self.sigma02 = sigma02
-        self. X_tilde_train = X_tilde_train
-        self.y_train = y_train
-        self.X_tilde_test = X_tilde_test
-        self.y_test = y_test
+        self.count = 0
 
     def plot_data_internal(self, X, y):
         """Function that plots the points in 2D together with their labels"""
@@ -129,12 +126,6 @@ class BayesianLogisticClassifier:
         A0 = 1 / self.sigma02 * np.identity(len(w))
         sigmoid_value = self.logistic(np.dot(X_tilde, w))
         AN = A0 + np.transpose(X_tilde) @ np.diag(np.multiply(sigmoid_value, np.ones(sigmoid_value.shape[0]) - sigmoid_value)) @ X_tilde
-        '''
-        AN = A0
-        for row in X_tilde:
-            sigmoid_value = self.logistic(np.dot(row, w))
-            AN += sigmoid_value*(1-sigmoid_value)*row @ np.transpose(row)
-        '''
         return AN
 
     def f(self, w, X_tilde):
@@ -143,25 +134,56 @@ class BayesianLogisticClassifier:
         prior = np.exp(-0.5 * np.transpose(w) @ A0 @ w)
         return np.prod(self.predict(X_tilde, w))*prior
 
-    def log_f(self, w, *args):
-        """Function that computes the average loglikelihood of the logistic classifier on some data"""
+    def compute_ll(self, w, *args):
+        """Function that computes the loglikelihood of the logistic classifier on some data, multiplied by -1"""
+        ErrorHandler = False
+        self.count += 1
+        if self.count % 10 == 0:
+            print('Iter: {}'.format(self.count))
+
         X_tilde = args[0]
         y = args[1]
-        output_prob = self.predict(X_tilde, w)
         A0 = 1 / self.sigma02 * np.identity(w.shape[0])
-        # print(output_prob)
-        with np.errstate(divide='raise'):
-            try:
-                return np.sum(y * np.log(output_prob) + (1 - y) * np.log(1.0 - output_prob)) - (0.5 * np.transpose(w) @ A0 @ w)
-            except FloatingPointError:
-                print('here')
-                return np.sum(y * (X_tilde @ w) + (1 - y) * np.log(1.0 - output_prob)) - (
-                            0.5 * np.transpose(w) @ A0 @ w)
+        output_prob = self.predict(X_tilde, w)
+        grad = -1 * (np.transpose(X_tilde) @ (y - output_prob) - w / self.sigma02)
+        if ErrorHandler:
+            with np.errstate(divide='raise'):
+                # Not sure this works because code has been vectorised
+                try:
+                    log_f = -1 * (np.sum(y * np.log(output_prob) + (1 - y) * np.log(1.0 - output_prob)) - (
+                                0.5 * np.transpose(w) @ A0 @ w))
 
-    def compute_wmap(self, X_tilde_train, y):
+                except FloatingPointError:
+                    log_f - 1 * (np.sum(y * (X_tilde @ w)) - (0.5 * np.transpose(w) @ A0 @ w))
+        else:
+            log_f = -1 * (np.sum(y * np.log(output_prob) + (1 - y) * np.log(1.0 - output_prob)) - (
+                        0.5 * np.transpose(w) @ A0 @ w))
+        return log_f, grad
+
+    def compute_wmap(self, X_tilde_train, y, maxfun=100000):
         w0 = np.random.randn(X_tilde_train.shape[1])
-        wmap = scipy.optimize.fmin_l_bfgs_b(self.log_f, w0, args=tuple([X_tilde_train, y]), approx_grad=True)
-        return wmap
+        wmap = scipy.optimize.fmin_l_bfgs_b(self.compute_ll, w0, args=tuple([X_tilde_train, y]), maxfun=maxfun)
+        return wmap[0], -wmap[1] # Note sign to ensure fmap is negative
 
-    def compute_evidence(self, wmap, AN):
-        return np.exp(self.log_f(wmap, args=tuple([X_tilde_train, y])))*(2*np.pi)**(wmap.shape[0]/2)*np.linalg.det(AN)**(-0.5)
+    def compute_evidence(self, fmap, AN):
+        return fmap*(2*np.pi)**(AN.shape[0]/2)*np.linalg.det(AN)**(-0.5)
+
+    def f(self, w, X_tilde):
+        """Returns the unnormalised posterior"""
+        A0 = 1 / self.sigma02 * np.identity(w.shape[0])
+        prior = np.exp(-0.5 * np.transpose(w) @ A0 @ w)
+        return np.prod(self.predict(X_tilde, w))*prior
+
+    def fit_w(self, X_tilde_train, y_train, X_tilde_test, y_test, n_steps, alpha):
+        """Function that finds the model parameters by optimising the likelihood using gradient descent"""
+        w = np.random.randn(X_tilde_train.shape[1])
+        ll_train = np.zeros(n_steps)
+        ll_test = np.zeros(n_steps)
+        for i in range(n_steps):
+            sigmoid_value = self.logistic(np.dot(X_tilde_train, w))
+            grad = np.transpose(X_tilde_train) @ (y_train - sigmoid_value) - w / self.sigma02
+            w = w + alpha * grad
+            ll_train[i] = self.compute_average_ll(X_tilde_train, y_train, w)
+            ll_test[i] = self.compute_average_ll(X_tilde_test, y_test, w)
+
+        return w, ll_train, ll_test

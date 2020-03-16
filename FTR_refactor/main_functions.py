@@ -62,10 +62,10 @@ class BayesianLogisticClassifier:
 
     # Training
     def _logistic(self, x):
-        """The logistic function"""
+        """The logistic function. Returns NaN if function overflows"""
         f = np.array([])
         with np.errstate(all='raise'):
-            for i in x: # What about very large negative vals?
+            for i in x:
                 try:
                     val = 1.0 / (1.0 + np.exp(-i))
                 except FloatingPointError:
@@ -74,7 +74,8 @@ class BayesianLogisticClassifier:
         return f
 
     def _predict(self, X_tilde, w, ll=False):
-        """Function that makes predictions with a logistic classifier"""
+        """Function that makes predictions with a logistic classifier. If the logistic function overflows,
+        only the exponent is returned as per the coursework hint """
         mu = np.dot(X_tilde, w)
         sigma2 = np.diag(X_tilde @ self.AN @ np.transpose(X_tilde))
         exponent = np.divide(mu, np.sqrt(1 + np.pi * sigma2 / 8))
@@ -103,7 +104,7 @@ class BayesianLogisticClassifier:
 
         A0 = 1 / self.sigma02 * np.identity(w.shape[0])
         self.update_AN(w)
-        output_prob = self._predict(self.X_tilde, w, ll=True)#self._logistic(np.dot(self.X_tilde, w))
+        output_prob = self._predict(self.X_tilde, w, ll=True)
         grad = -1 * (np.transpose(self.X_tilde) @ (self.y - output_prob) - w / self.sigma02)
         log_f = np.array([])
         if ErrorHandler:

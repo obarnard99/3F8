@@ -5,11 +5,7 @@ import scipy.optimize
 
 class BayesianLogisticClassifier:
     # Dataset Initialisation
-    def __init__(self, X, y, l, sigma02, RBF=False, mode='train'):
-        self.sigma02 = sigma02
-        self.count = 0
-        self.RBF = RBF
-        self.l = l
+    def __init__(self, X, y, mode='train', predictor='laplace'):
         self.X0 = np.loadtxt(X)
         self.y0 = np.loadtxt(y)
 
@@ -25,30 +21,40 @@ class BayesianLogisticClassifier:
         self.y_train = y[0: n_train]
         self.y_test = y[n_train:]
 
-        self.generate_datasets()
-        self.set_mode(mode)
+        self.mode = mode
+        self.set_predictor(predictor)
 
-    def generate_datasets(self):
+    def generate_datasets(self, sigma02=1, l=None):
         """Function that expands a matrix of input features by adding a column equal to 1 and with radial basis
         functions if necessary """
-        if self.RBF:
-            expanded_X_train = self._evaluate_basis_functions(self.l, self.X_train, self.X_train)
+        self.sigma02 = sigma02
+        self.l = l
+        if self.l is not None:
+            expanded_X_train = self._evaluate_basis_functions(l, self.X_train, self.X_train)
             self.X_tilde_train = np.concatenate((np.ones((expanded_X_train.shape[0], 1)), expanded_X_train), 1)
-            expanded_X_test = self._evaluate_basis_functions(self.l, self.X_test, self.X_train)
+            expanded_X_test = self._evaluate_basis_functions(l, self.X_test, self.X_train)
             self.X_tilde_test = np.concatenate((np.ones((expanded_X_test.shape[0], 1)), expanded_X_test), 1)
-
         else:
             self.X_tilde_train = np.concatenate((np.ones((self.X_train.shape[0], 1)), self.X_train), 1)
             self.X_tilde_test = np.concatenate((np.ones((self.X_train.shape[0], 1)), self.X_train), 1)
+        self.set_mode(self.mode)
 
     def set_mode(self, mode):
         """Sets the mode of operation to training or testing"""
+        self.mode = mode
         if mode.lower() == 'train':
             self.X_tilde = self.X_tilde_train
             self.y = self.y_train
         elif mode.lower() == 'test':
             self.X_tilde = self.X_tilde_test
             self.y = self.y_test
+
+    def set_predictor(self, fn):
+        self.predictor = fn.lower()
+        if fn.lower() == 'laplace':
+            self._predict = self._compute_laplace_prediction
+        elif fn.lower() == 'map':
+            self._predict = self._compute_MAP_prediction
 
     def _evaluate_basis_functions(self, l, X, Z):
         """Function that replaces initial input features by evaluating Gaussian basis functions on a grid of points"""
@@ -61,69 +67,60 @@ class BayesianLogisticClassifier:
 
 
     # Training
-    def _logistic(self, x):
-        """The logistic function. Returns NaN if function overflows"""
+    def _logistic(self, x, NaNflag=False):
+        """The logistic function. If function overflows, returns 0 for that value or NaN if NaNflag set"""
         f = np.array([])
         with np.errstate(all='raise'):
             for i in x:
                 try:
                     val = 1.0 / (1.0 + np.exp(-i))
                 except FloatingPointError:
-                    val = np.nan
+                    if NaNflag:
+                        val = np.nan
+                    else:
+                        val = 0
                 f = np.append(f, val)
         return f
 
-    def _predict(self, X_tilde, w, ll=False):
-        """Function that makes predictions with a logistic classifier. If the logistic function overflows,
-        only the exponent is returned as per the coursework hint """
+    def _compute_laplace_prediction(self, X_tilde, w):
+        """Function that makes predictions with a Laplacian approximation"""
+        AN = self._compute_AN(w)
         mu = np.dot(X_tilde, w)
-        sigma2 = np.diag(X_tilde @ self.AN @ np.transpose(X_tilde))
+        sigma2 = np.diag(X_tilde @ AN @ np.transpose(X_tilde))
         exponent = np.divide(mu, np.sqrt(1 + np.pi * sigma2 / 8))
-        prediction = self._logistic(exponent)
-        inds = np.where(np.isnan(prediction))
-        if ll:
-            prediction[inds] = -np.take(exponent, inds)
-        else:
-            prediction[inds] = 1
-        return prediction
+        return self._logistic(exponent)
 
-    def update_AN(self, w):
-        A0 = 1 / self.sigma02 * np.identity(len(w))
-        sigmoid_value = self._logistic(np.dot(self.X_tilde, w))
-        self.AN = A0 + np.transpose(self.X_tilde) @ np.diag(np.multiply(sigmoid_value, np.ones(sigmoid_value.shape[0]) - sigmoid_value)) @ self.X_tilde
-        #print(self.AN)
+    def _compute_MAP_prediction(self, X_tilde, w):
+        """Function that makes predictions with a logistic classifier and the MAP weights"""
+        return self._logistic(np.dot(X_tilde, w))
 
     def _compute_ll(self, w):
         """Function that computes the loglikelihood of the logistic classifier on some data, multiplied by -1"""
-        ErrorHandler = True
-        iterCount = False
-        if iterCount:
-            self.count += 1
-            if self.count % 10 == 0:
-                print('Iter: {}'.format(self.count))
-
         A0 = 1 / self.sigma02 * np.identity(w.shape[0])
-        self.update_AN(w)
-        output_prob = self._predict(self.X_tilde, w, ll=True)
-        grad = -1 * (np.transpose(self.X_tilde) @ (self.y - output_prob) - w / self.sigma02)
-        log_f = np.array([])
-        if ErrorHandler:
-            for idx, prob in enumerate(output_prob):
-                if prob < 0.:
-                    val = -prob
-                else:
-                    val = self.y[idx] * np.log(prob) + (1. - self.y[idx]) * np.log(1.0 - prob)
-                log_f = np.append(log_f, val)
-            log_f = -1 * (np.sum(log_f) - (0.5 * np.transpose(w) @ A0 @ w))
-        else:
-            log_f = -1. * (np.sum(self.y * np.log(output_prob) + (1. - self.y) * np.log(1.0 - output_prob)) - (
-                        0.5 * np.transpose(w) @ A0 @ w))
-        return log_f, grad
+        exponent = np.dot(self.X_tilde, w)
+        sigmoid_value = self._logistic(exponent, NaNflag=True)
+        pointwise_ll = self.y * np.log(sigmoid_value) + (1. - self.y) * np.log(1.0 - sigmoid_value)
+        inds = np.where(np.isnan(pointwise_ll))
+        pointwise_ll[inds] = np.take(exponent, inds)
+        if self.predictor == 'map':
+            ll = -1. * np.sum(pointwise_ll)
+            sigmoid_value[inds] = 0
+            grad = -1 * np.transpose(self.X_tilde) @ (self.y - sigmoid_value)
+        elif self.predictor == 'laplace':
+            ll = -1. * (np.sum(pointwise_ll) - (0.5 * np.transpose(w) @ A0 @ w))
+            sigmoid_value[inds] = 0
+            grad = -1 * (np.transpose(self.X_tilde) @ (self.y - sigmoid_value) - w / self.sigma02)
+        return ll, grad
 
     def compute_wmap(self):
         w0 = np.zeros(self.X_tilde.shape[1])
         wmap = scipy.optimize.fmin_l_bfgs_b(self._compute_ll, w0)
-        return wmap[0], -wmap[1] # Note sign to ensure fmap is negative
+        return wmap[0], -wmap[1] # Note sign to ensure log(fmap) is negative
+
+    def _compute_AN(self, w):
+        A0 = 1 / self.sigma02 * np.identity(len(w))
+        sigmoid_value = self._logistic(np.dot(self.X_tilde, w))
+        return A0 + np.transpose(self.X_tilde) @ np.diag(np.multiply(sigmoid_value, np.ones(sigmoid_value.shape[0]) - sigmoid_value)) @ self.X_tilde
 
 
     # Plotting
@@ -143,7 +140,7 @@ class BayesianLogisticClassifier:
         """Function that plots the predictive probabilities of the logistic classifier"""
         xx, yy = self._plot_data_internal()
         ax = plt.gca()
-        if self.RBF:
+        if self.l is not None:
             map_inputs = lambda x: self._evaluate_basis_functions(self.l, x, self.X_train)
             mapped_inputs = map_inputs(np.concatenate((xx.ravel().reshape((-1, 1)), yy.ravel().reshape((-1, 1))), 1))
         else:
@@ -182,13 +179,12 @@ class BayesianLogisticClassifier:
     # Performance Metrics
     def compute_average_ll(self, w):
         """Function that computes the average loglikelihood of the logistic classifier on some data"""
-        output_prob = self._predict(self.X_tilde, w)
-        return np.mean(self.y * np.log(output_prob) + (1 - self.y) * np.log(1.0 - output_prob))
+        return -self._compute_ll(w)[0]/self.X_tilde.shape[0]
 
     def compute_confusion_matrix(self, w):
         """Computes the confusion matrix"""
-        sigmoid_values = self._predict(self.X_tilde, w)
-        thresholded_values = sigmoid_values > 0.5
+        prediction = self._predict(self.X_tilde, w)
+        thresholded_values = prediction > 0.5
         num_ones = np.count_nonzero(self.y)
         num_zeros = len(self.y) - num_ones
         confusion = [0, 0, 0, 0]
@@ -207,8 +203,9 @@ class BayesianLogisticClassifier:
                 confusion[3] += 1 / num_ones
         return confusion
 
-    def compute_evidence(self, fmap):
-        return fmap*(2*np.pi)**(self.AN.shape[0]/2)*np.linalg.det(self.AN)**(-0.5)
-
-
+    def compute_log_evidence(self, w, log_fmap):
+        """Computes the natural logarithm of the model evidence"""
+        AN = self._compute_AN(w)
+        sign, logdet = np.linalg.slogdet(AN)
+        return log_fmap + (AN.shape[0]/2) * np.log(2*np.pi) - 0.5 * sign * logdet
 

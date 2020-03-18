@@ -31,13 +31,13 @@ class BayesianLogisticClassifier:
         self.l = l
         if self.l is not None:
             expanded_X_train = self._evaluate_basis_functions(l, self.X_train, self.X_train)
-            self.X_tilde_train = np.concatenate((np.ones((expanded_X_train.shape[0], 1)), expanded_X_train), 1)
+            self.X_tilde_train = self._get_x_tilde(expanded_X_train)
             expanded_X_test = self._evaluate_basis_functions(l, self.X_test, self.X_train)
-            self.X_tilde_test = np.concatenate((np.ones((expanded_X_test.shape[0], 1)), expanded_X_test), 1)
+            self.X_tilde_test = self._get_x_tilde(expanded_X_test)
         else:
-            self.X_tilde_train = np.concatenate((np.ones((self.X_train.shape[0], 1)), self.X_train), 1)
-            self.X_tilde_test = np.concatenate((np.ones((self.X_train.shape[0], 1)), self.X_train), 1)
-        self.set_mode(self.mode)
+            self.X_tilde_train = self._get_x_tilde(self.X_train)
+            self.X_tilde_test = self._get_x_tilde(self.X_test)
+        self.set_mode(self.mode) # Updates internal datasets accordingly
 
     def set_mode(self, mode):
         """Sets the mode of operation to training or testing"""
@@ -55,6 +55,10 @@ class BayesianLogisticClassifier:
             self._predict = self._compute_laplace_prediction
         elif fn.lower() == 'map':
             self._predict = self._compute_MAP_prediction
+
+    def _get_x_tilde(self, X):
+        """Function that expands a matrix of input features by adding a column equal to 1"""
+        return np.concatenate((np.ones((X.shape[0], 1)), X), 1)
 
     def _evaluate_basis_functions(self, l, X, Z):
         """Function that replaces initial input features by evaluating Gaussian basis functions on a grid of points"""
@@ -107,7 +111,7 @@ class BayesianLogisticClassifier:
             sigmoid_value[inds] = 0
             grad = -1 * np.transpose(self.X_tilde) @ (self.y - sigmoid_value)
         elif self.predictor == 'laplace':
-            ll = -1. * (np.sum(pointwise_ll) - (0.5 * np.transpose(w) @ A0 @ w))
+            ll = -1. * (np.sum(pointwise_ll) - (0.5 * np.transpose(w) @ A0 @ w) - w.shape[0]/2 * np.log(2*np.pi*self.sigma02))
             sigmoid_value[inds] = 0
             grad = -1 * (np.transpose(self.X_tilde) @ (self.y - sigmoid_value) - w / self.sigma02)
         return ll, grad
@@ -120,7 +124,7 @@ class BayesianLogisticClassifier:
     def _compute_AN(self, w):
         A0 = 1 / self.sigma02 * np.identity(len(w))
         sigmoid_value = self._logistic(np.dot(self.X_tilde, w))
-        return A0 + np.transpose(self.X_tilde) @ np.diag(np.multiply(sigmoid_value, np.ones(sigmoid_value.shape[0]) - sigmoid_value)) @ self.X_tilde
+        return A0 + np.transpose(self.X_tilde) @ np.diag(np.multiply(sigmoid_value, 1 - sigmoid_value)) @ self.X_tilde
 
 
     # Plotting
@@ -145,7 +149,7 @@ class BayesianLogisticClassifier:
             mapped_inputs = map_inputs(np.concatenate((xx.ravel().reshape((-1, 1)), yy.ravel().reshape((-1, 1))), 1))
         else:
             mapped_inputs = np.concatenate((xx.ravel().reshape((-1, 1)), yy.ravel().reshape((-1, 1))), 1)
-        X_tilde = np.concatenate((np.ones((mapped_inputs.shape[0], 1)), mapped_inputs), 1)
+        X_tilde = self._get_x_tilde(mapped_inputs)
         Z = self._predict(X_tilde, w)
         Z = Z.reshape(xx.shape)
         cs2 = ax.contour(xx, yy, Z, cmap='RdBu', linewidths=2)
@@ -204,8 +208,9 @@ class BayesianLogisticClassifier:
         return confusion
 
     def compute_log_evidence(self, w, log_fmap):
-        """Computes the natural logarithm of the model evidence"""
+        """Computes the natural logarithm of the model evidence. Note that we throw away the constant term as this
+        adds unnecessary computation """
         AN = self._compute_AN(w)
         sign, logdet = np.linalg.slogdet(AN)
-        return log_fmap + (AN.shape[0]/2) * np.log(2*np.pi) - 0.5 * sign * logdet
+        return log_fmap - 0.5 * logdet #+ (AN.shape[0]/2) * np.log(2*np.pi)
 

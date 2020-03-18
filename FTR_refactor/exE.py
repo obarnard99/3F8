@@ -1,4 +1,4 @@
-from FTR_refactor.main_functions import BayesianLogisticClassifier
+from FTRv2.main_functions import BayesianLogisticClassifier
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns

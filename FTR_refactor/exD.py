@@ -1,4 +1,4 @@
-from FTR_refactor.main_functions import BayesianLogisticClassifier
+from FTRv2.main_functions import BayesianLogisticClassifier
 
 # Define dataset
 X = 'X.txt'

@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from FTR.main_functions import BayesianLogisticClassifier
+from FTRv1.main_functions import BayesianLogisticClassifier
 
 # Initialise dataset
 # Import dataset
